@@ -1,0 +1,161 @@
+{
+  "profile": {
+    "name": "Prashant Gautam",
+    "headline": "Software Engineer",
+    "email": "prashant@example.com",
+    "phone": "+91-XXXXXXXXXX",
+    "location": "Ghaziabad, India",
+    "linkedin": "linkedin.com/in/prashantgautam",
+    "github": "github.com/prashantgautam"
+  },
+  "skills": [
+    {"name": "Python", "tags": ["backend", "ai", "data"]},
+    {"name": "Java", "tags": ["backend"]},
+    {"name": "JavaScript", "tags": ["frontend", "fullstack"]},
+    {"name": "React", "tags": ["frontend", "fullstack"]},
+    {"name": "Node.js", "tags": ["backend", "fullstack"]},
+    {"name": "FastAPI", "tags": ["backend", "api"]},
+    {"name": "PostgreSQL", "tags": ["database", "backend"]},
+    {"name": "MongoDB", "tags": ["database", "backend"]},
+    {"name": "Redis", "tags": ["backend", "distributed-systems"]},
+    {"name": "Docker", "tags": ["devops", "infrastructure"]},
+    {"name": "Kubernetes", "tags": ["devops", "infrastructure"]},
+    {"name": "AWS", "tags": ["cloud", "devops"]},
+    {"name": "OpenCV", "tags": ["ai", "cv"]},
+    {"name": "TensorFlow", "tags": ["ai", "ml", "deep-learning"]},
+    {"name": "PyTorch", "tags": ["ai", "ml", "deep-learning"]},
+    {"name": "Machine Learning", "tags": ["ai", "ml"]},
+    {"name": "Computer Vision", "tags": ["ai", "cv"]},
+    {"name": "REST API", "tags": ["backend", "api"]},
+    {"name": "Microservices", "tags": ["backend", "distributed-systems"]},
+    {"name": "Git", "tags": ["general"]},
+    {"name": "CI/CD", "tags": ["devops"]},
+    {"name": "Elasticsearch", "tags": ["backend", "database"]}
+  ],
+  "experience": [
+    {
+      "company": "Zuci Systems",
+      "role": "Software Development Engineer",
+      "duration": "Jan 2023 - Present",
+      "bullets": [
+        {
+          "id": "exp1_b1",
+          "text": "Built scalable SSE (Server-Sent Events) service for real-time agent module communication, handling 10K+ concurrent connections",
+          "tags": ["backend", "distributed-systems", "api"]
+        },
+        {
+          "id": "exp1_b2",
+          "text": "Developed microservices architecture using FastAPI and PostgreSQL, reducing API response time by 40%",
+          "tags": ["backend", "microservices", "database", "api"]
+        },
+        {
+          "id": "exp1_b3",
+          "text": "Implemented Redis caching layer for frequently accessed data, improving system throughput by 3x",
+          "tags": ["backend", "distributed-systems", "database"]
+        },
+        {
+          "id": "exp1_b4",
+          "text": "Designed and deployed containerized services using Docker and Kubernetes on AWS EKS",
+          "tags": ["devops", "cloud", "infrastructure"]
+        }
+      ]
+    },
+    {
+      "company": "Tech Startup (Contract)",
+      "role": "Full Stack Developer",
+      "duration": "Jun 2022 - Dec 2022",
+      "bullets": [
+        {
+          "id": "exp2_b1",
+          "text": "Built responsive web application using React and Node.js serving 5000+ daily active users",
+          "tags": ["frontend", "fullstack", "backend"]
+        },
+        {
+          "id": "exp2_b2",
+          "text": "Integrated third-party payment gateway (Razorpay) with backend REST APIs",
+          "tags": ["backend", "api", "fullstack"]
+        },
+        {
+          "id": "exp2_b3",
+          "text": "Implemented MongoDB aggregation pipelines for complex analytics queries",
+          "tags": ["database", "backend"]
+        }
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "id": "proj1",
+      "name": "Vehicle Tracking System",
+      "description": "Real-time vehicle detection and tracking using computer vision",
+      "tags": ["ai", "cv", "ml"],
+      "technologies": ["Python", "OpenCV", "YOLOv5", "FastAPI"],
+      "bullets": [
+        "Developed OpenCV-based vehicle detection pipeline achieving 92% accuracy",
+        "Implemented YOLOv5 object detection model with custom training on 10K+ images",
+        "Built REST API for real-time video stream processing and analysis",
+        "Deployed model inference service handling 30 FPS video streams"
+      ]
+    },
+    {
+      "id": "proj2",
+      "name": "Distributed Task Queue System",
+      "description": "Scalable async task processing system",
+      "tags": ["backend", "distributed-systems"],
+      "technologies": ["Python", "Redis", "PostgreSQL", "Docker"],
+      "bullets": [
+        "Designed distributed task queue using Redis and Celery for async job processing",
+        "Implemented retry logic and dead letter queues for fault tolerance",
+        "Built monitoring dashboard tracking queue depth and task success rates",
+        "Scaled system to process 1M+ tasks per day across 5 worker nodes"
+      ]
+    },
+    {
+      "id": "proj3",
+      "name": "AI-Powered Chatbot",
+      "description": "NLP-based customer support chatbot",
+      "tags": ["ai", "nlp", "ml"],
+      "technologies": ["Python", "TensorFlow", "BERT", "FastAPI"],
+      "bullets": [
+        "Fine-tuned BERT model for intent classification with 89% accuracy",
+        "Implemented context-aware conversation flow using dialogue management",
+        "Built API service serving 1000+ requests per minute",
+        "Reduced customer support tickets by 35% through automated responses"
+      ]
+    },
+    {
+      "id": "proj4",
+      "name": "E-commerce Platform",
+      "description": "Full-stack online shopping platform",
+      "tags": ["fullstack", "frontend", "backend"],
+      "technologies": ["React", "Node.js", "MongoDB", "Stripe"],
+      "bullets": [
+        "Built complete e-commerce platform with product catalog and shopping cart",
+        "Implemented secure payment processing using Stripe API",
+        "Designed responsive UI with React and Tailwind CSS",
+        "Created RESTful APIs for inventory management and order processing"
+      ]
+    },
+    {
+      "id": "proj5",
+      "name": "Infrastructure Automation",
+      "description": "DevOps pipeline and infrastructure as code",
+      "tags": ["devops", "infrastructure", "ci-cd"],
+      "technologies": ["Terraform", "Ansible", "Jenkins", "AWS"],
+      "bullets": [
+        "Automated infrastructure provisioning using Terraform for AWS resources",
+        "Built CI/CD pipelines with Jenkins reducing deployment time by 60%",
+        "Implemented configuration management using Ansible across 20+ servers",
+        "Set up monitoring and alerting using Prometheus and Grafana"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Bachelor of Technology in Computer Science",
+      "institution": "XYZ University",
+      "year": "2022",
+      "gpa": "8.5/10"
+    }
+  ]
+}

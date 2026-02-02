@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ResumeOS Compiler - Transform your master resume into role-optimized versions">
+    <title>ResumeOS Compiler - Transform Your Resume</title>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header" role="banner">
+            <h1 class="header__title">🚀 ResumeOS Compiler</h1>
+            <p class="header__subtitle">Transform your master resume into role-optimized versions</p>
+            <div class="header__status" id="aiStatus" role="status" aria-live="polite">
+                <span id="aiIndicator" aria-label="AI Status">🤖 AI: Checking...</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="content" role="main">
+            <!-- Form Section -->
+            <form id="resumeForm" aria-label="Resume Compilation Form">
+                <!-- LaTeX Resume Input -->
+                <section class="section" aria-labelledby="latex-title">
+                    <h2 class="section__title" id="latex-title">Master Resume (LaTeX)</h2>
+                    <div class="form-group">
+                        <label for="latexResume" class="form-group__label">
+                            Paste your LaTeX resume or load example:
+                        </label>
+                        <div class="example-buttons" role="group" aria-label="Example resume options">
+                            <button type="button" class="example-btn" onclick="loadExampleLatex()" aria-label="Load example LaTeX resume">
+                                Load Example LaTeX Resume
+                            </button>
+                        </div>
+                        <textarea 
+                            id="latexResume" 
+                            class="form-control form-control--textarea"
+                            placeholder="\documentclass{article}..."
+                            aria-label="LaTeX resume content"
+                            required
+                            rows="15"
+                        ></textarea>
+                    </div>
+                </section>
+
+                <!-- Job Description Input -->
+                <section class="section" aria-labelledby="jd-title">
+                    <h2 class="section__title" id="jd-title">Job Description</h2>
+                    <div class="form-group">
+                        <label for="jobDescription" class="form-group__label">
+                            Paste the job description:
+                        </label>
+                        <div class="example-buttons" role="group" aria-label="Example job description options">
+                            <button type="button" class="example-btn" onclick="loadExampleJD('ai')" aria-label="Load AI Engineer job description">
+                                AI Engineer JD
+                            </button>
+                            <button type="button" class="example-btn" onclick="loadExampleJD('backend')" aria-label="Load Backend Engineer job description">
+                                Backend Engineer JD
+                            </button>
+                            <button type="button" class="example-btn" onclick="loadExampleJD('devops')" aria-label="Load DevOps Engineer job description">
+                                DevOps Engineer JD
+                            </button>
+                        </div>
+                        <textarea 
+                            id="jobDescription" 
+                            class="form-control form-control--textarea"
+                            placeholder="Paste job description here..."
+                            aria-label="Job description"
+                            required
+                            rows="10"
+                        ></textarea>
+                    </div>
+                </section>
+
+                <!-- Role Override -->
+                <section class="section" aria-labelledby="role-title">
+                    <h2 class="section__title" id="role-title">Role Override (Optional)</h2>
+                    <div class="form-group">
+                        <label for="roleOverride" class="form-group__label">
+                            Role Override (Auto-detected if empty):
+                        </label>
+                        <select 
+                            id="roleOverride" 
+                            class="form-control form-control--select"
+                            aria-label="Select role override"
+                        >
+                            <option value="">Auto-detect</option>
+                            <option value="ai_engineer">AI Engineer</option>
+                            <option value="backend_engineer">Backend Engineer</option>
+                            <option value="devops_engineer">DevOps Engineer</option>
+                            <option value="full_stack">Full Stack Engineer</option>
+                            <option value="data_engineer">Data Engineer</option>
+                        </select>
+                        <small class="form-group__help">
+                            Leave empty to auto-detect role from job description
+                        </small>
+                    </div>
+                </section>
+
+                <!-- AI Toggle -->
+                <section class="section" aria-labelledby="ai-title">
+                    <h2 class="section__title" id="ai-title">AI Enhancement</h2>
+                    <div class="form-group">
+                        <label class="checkbox">
+                            <input 
+                                type="checkbox" 
+                                id="enableAI" 
+                                class="checkbox__input"
+                                checked
+                                aria-describedby="ai-help"
+                            >
+                            <span class="checkbox__label">Enable AI Enhancement</span>
+                        </label>
+                        <small id="ai-help" class="form-group__help">
+                            When enabled, AI will rewrite bullets to better match the target role. Requires API key.
+                        </small>
+                    </div>
+                </section>
+
+                <!-- Action Buttons -->
+                <div class="button-group" role="group" aria-label="Form actions">
+                    <button type="submit" class="btn btn--primary" id="compileBtn">
+                        Compile Resume
+                    </button>
+                    <button type="button" class="btn btn--secondary" onclick="clearForm()" aria-label="Clear form">
+                        Clear
+                    </button>
+                </div>
+            </form>
+
+            <!-- Loading Indicator -->
+            <div class="loading" id="loading" role="status" aria-live="polite" aria-label="Loading">
+                <div class="spinner" aria-hidden="true"></div>
+                <p>Compiling your resume...</p>
+            </div>
+
+            <!-- Error Message -->
+            <div class="error" id="error" role="alert" aria-live="assertive"></div>
+
+            <!-- Results Section -->
+            <div class="results" id="results" role="region" aria-labelledby="results-title">
+                <h2 id="results-title" class="sr-only">Compilation Results</h2>
+                
+                <!-- Match Score -->
+                <div class="match-score">
+                    <div class="score-circle" id="scoreCircle" aria-label="Match score">0%</div>
+                    <div class="score-label">Match Score</div>
+                </div>
+
+                <!-- Info Grid -->
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h3 class="info-card__title">Target Role</h3>
+                        <p id="targetRole" aria-label="Detected target role">-</p>
+                    </div>
+                    <div class="info-card">
+                        <h3 class="info-card__title">Keywords Matched</h3>
+                        <p id="keywordsMatched" aria-label="Number of keywords matched">-</p>
+                    </div>
+                </div>
+
+                <!-- Skills Grid -->
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h3 class="info-card__title">Matched Skills</h3>
+                        <ul class="info-card__list" id="matchedSkills" aria-label="List of matched skills"></ul>
+                    </div>
+                    <div class="info-card">
+                        <h3 class="info-card__title">Missing Skills</h3>
+                        <ul class="info-card__list" id="missingSkills" aria-label="List of missing skills"></ul>
+                    </div>
+                </div>
+
+                <!-- Recommendations -->
+                <div class="info-card">
+                    <h3 class="info-card__title">Recommendations</h3>
+                    <ul class="info-card__list" id="recommendations" aria-label="Recommendations for improvement"></ul>
+                </div>
+
+                <!-- LaTeX Output -->
+                <section class="section" aria-labelledby="latex-output-title">
+                    <h2 class="section__title" id="latex-output-title">Generated LaTeX Resume</h2>
+                    <div class="form-group">
+                        <label for="latexOutput" class="form-group__label">
+                            Your tailored LaTeX resume (copy and use):
+                        </label>
+                        <textarea 
+                            id="latexOutput" 
+                            class="latex-output"
+                            readonly
+                            aria-label="Generated LaTeX resume content"
+                            rows="20"
+                        ></textarea>
+                        <div class="latex-output__actions">
+                            <button type="button" class="btn btn--secondary btn--small" onclick="copyLatex()" aria-label="Copy LaTeX to clipboard">
+                                📋 Copy LaTeX
+                            </button>
+                            <a 
+                                href="#" 
+                                id="downloadLink" 
+                                class="btn btn--secondary btn--small" 
+                                download
+                                style="display: none;"
+                                aria-label="Download LaTeX file"
+                            >
+                                💾 Download .tex File
+                            </a>
+                            <span class="latex-output__stats" id="latexStats" aria-label="LaTeX file statistics"></span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Screen Reader Only Class -->
+    <style>
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
+    </style>
+
+    <!-- Application JavaScript -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
