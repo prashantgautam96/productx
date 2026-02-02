@@ -17,11 +17,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Depends
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy.orm import Session
 
 # Import configuration and services
 from config import get_config
@@ -34,7 +36,24 @@ from exceptions import (
     ResumeOSError
 )
 from ai_agent import create_ai_agent
-from resume_compiler import ResumeCompiler
+from resume_compiler import ResumeCompiler, RoleType
+from db import init_db, get_db
+from models import User, MasterResume
+from auth import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    get_current_user,
+    get_optional_user
+)
+from schemas import (
+    RegisterRequest,
+    TokenResponse,
+    UserResponse,
+    MasterResumeCreateResponse,
+    MasterResumeListItem,
+    MasterResumeFromLatexRequest
+)
 
 # Configure logging from config
 config = get_config()
@@ -97,6 +116,7 @@ class TailorRequest(BaseModel):
     job_description: str
     role_override: Optional[str] = None  # 'ai_engineer', 'backend_engineer', etc.
     enable_ai: Optional[bool] = True  # Enable/disable AI rewriting
+    master_resume_id: Optional[int] = None  # Load stored master resume
 
 
 class TailorResponse(BaseModel):
@@ -121,6 +141,11 @@ app = FastAPI(
     description="Resume Compiler as a Service",
     version="2.1.0"
 )
+
+
+@app.on_event("startup")
+def _startup():
+    init_db()
 
 # CORS middleware for production
 app.add_middleware(
@@ -189,7 +214,11 @@ async def get_available_roles():
 
 
 @app.post("/resume/tailor")
-async def tailor_resume(request: TailorRequest) -> TailorResponse:
+async def tailor_resume(
+    request: TailorRequest,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
+) -> TailorResponse:
     """
     Compile master resume for specific job description
     
@@ -199,7 +228,27 @@ async def tailor_resume(request: TailorRequest) -> TailorResponse:
     """
     try:
         # Parse input (LaTeX or JSON)
-        if request.latex_resume:
+        if request.master_resume_id:
+            if not current_user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Authentication required to use stored master resumes"
+                )
+            stored = (
+                db.query(MasterResume)
+                .filter(
+                    MasterResume.id == request.master_resume_id,
+                    MasterResume.user_id == current_user.id
+                )
+                .first()
+            )
+            if not stored:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Master resume not found"
+                )
+            master_resume_dict = stored.data
+        elif request.latex_resume:
             master_resume_dict = resume_service.parse_latex_resume(request.latex_resume)
         elif request.master_resume:
             master_resume_dict = request.master_resume.model_dump()
@@ -388,6 +437,151 @@ async def analyze_match(request: AnalyzeRequest):
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ========== Auth & User ==========
+
+@app.post("/auth/register", response_model=UserResponse)
+async def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.email == payload.email).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+
+    user = User(email=payload.email, password_hash=hash_password(payload.password))
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return UserResponse(id=user.id, email=user.email, created_at=user.created_at)
+
+
+@app.post("/auth/login", response_model=TokenResponse)
+async def login_user(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.email == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
+
+    token = create_access_token(subject=user.email)
+    return TokenResponse(access_token=token)
+
+
+@app.get("/auth/me", response_model=UserResponse)
+async def get_me(current_user: User = Depends(get_current_user)):
+    return UserResponse(
+        id=current_user.id,
+        email=current_user.email,
+        created_at=current_user.created_at
+    )
+
+
+# ========== Master Resume Storage ==========
+
+@app.post("/master-resume", response_model=MasterResumeCreateResponse)
+async def save_master_resume(
+    payload: MasterResumeModel,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    record = MasterResume(user_id=current_user.id, data=payload.model_dump())
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return MasterResumeCreateResponse(
+        id=record.id,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+        master_resume=record.data
+    )
+
+
+@app.post("/master-resume/from-latex", response_model=MasterResumeCreateResponse)
+async def save_master_resume_from_latex(
+    payload: MasterResumeFromLatexRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    parsed = resume_service.parse_latex_resume(payload.latex_resume)
+    record = MasterResume(user_id=current_user.id, data=parsed)
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return MasterResumeCreateResponse(
+        id=record.id,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+        master_resume=record.data
+    )
+
+
+@app.get("/master-resume/latest", response_model=MasterResumeCreateResponse)
+async def get_latest_master_resume(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    record = (
+        db.query(MasterResume)
+        .filter(MasterResume.user_id == current_user.id)
+        .order_by(MasterResume.created_at.desc())
+        .first()
+    )
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No master resume found")
+    return MasterResumeCreateResponse(
+        id=record.id,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+        master_resume=record.data
+    )
+
+
+@app.get("/master-resume/{resume_id}", response_model=MasterResumeCreateResponse)
+async def get_master_resume_by_id(
+    resume_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    record = (
+        db.query(MasterResume)
+        .filter(MasterResume.id == resume_id, MasterResume.user_id == current_user.id)
+        .first()
+    )
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Master resume not found")
+    return MasterResumeCreateResponse(
+        id=record.id,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+        master_resume=record.data
+    )
+
+
+@app.get("/master-resume", response_model=list[MasterResumeListItem])
+async def list_master_resumes(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    records = (
+        db.query(MasterResume)
+        .filter(MasterResume.user_id == current_user.id)
+        .order_by(MasterResume.created_at.desc())
+        .all()
+    )
+    return [
+        MasterResumeListItem(
+            id=r.id,
+            created_at=r.created_at,
+            updated_at=r.updated_at
+        )
+        for r in records
+    ]
 
 
 # ========== Run Server ==========

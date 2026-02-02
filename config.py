@@ -40,6 +40,14 @@ class AppConfig:
     max_bullets_per_experience: int = 6
     max_skills: int = 20
     min_match_score_threshold: float = 0.0
+
+    # Database Configuration
+    database_url: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/resumeos"
+
+    # Auth / JWT
+    jwt_secret: str = "change-me"
+    jwt_algorithm: str = "HS256"
+    jwt_expires_minutes: int = 60
     
     @classmethod
     def from_env(cls) -> "AppConfig":
@@ -76,6 +84,17 @@ class AppConfig:
             max_bullets_per_experience=int(os.getenv("MAX_BULLETS_PER_EXPERIENCE", "6")),
             max_skills=int(os.getenv("MAX_SKILLS", "20")),
             min_match_score_threshold=float(os.getenv("MIN_MATCH_SCORE_THRESHOLD", "0.0")),
+
+            # Database
+            database_url=os.getenv(
+                "DATABASE_URL",
+                "postgresql+psycopg2://postgres:postgres@localhost:5432/resumeos"
+            ),
+
+            # Auth / JWT
+            jwt_secret=os.getenv("JWT_SECRET", "change-me"),
+            jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
+            jwt_expires_minutes=int(os.getenv("JWT_EXPIRES_MINUTES", "60")),
         )
     
     @staticmethod

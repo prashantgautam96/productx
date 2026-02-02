@@ -15,23 +15,66 @@ const AppState = {
     hasError: false,
     errorMessage: '',
     result: null,
-    aiStatus: null
+    aiStatus: null,
+    authToken: null,
+    currentUser: null
 };
 
 // API Configuration
 const API = {
     base: window.location.origin,
+
+    authHeaders() {
+        return AppState.authToken
+            ? { Authorization: `Bearer ${AppState.authToken}` }
+            : {};
+    },
     
     async status() {
         const response = await fetch(`${this.base}/api/status`);
         if (!response.ok) throw new Error('Failed to fetch status');
         return response.json();
     },
+
+    async register(email, password) {
+        const response = await fetch(`${this.base}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+            throw new Error(error.detail || 'Failed to register');
+        }
+        return response.json();
+    },
+
+    async login(email, password) {
+        const body = new URLSearchParams({ username: email, password });
+        const response = await fetch(`${this.base}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+            throw new Error(error.detail || 'Failed to login');
+        }
+        return response.json();
+    },
+
+    async me() {
+        const response = await fetch(`${this.base}/auth/me`, {
+            headers: { ...this.authHeaders() }
+        });
+        if (!response.ok) throw new Error('Failed to fetch user');
+        return response.json();
+    },
     
     async tailor(data) {
         const response = await fetch(`${this.base}/resume/tailor`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
             body: JSON.stringify(data)
         });
         
@@ -47,6 +90,30 @@ const API = {
         const response = await fetch(`${this.base}/resume/download/${filename}`);
         if (!response.ok) throw new Error('Failed to download file');
         return response.text();
+    },
+
+    async saveMasterResumeFromLatex(latexResume) {
+        const response = await fetch(`${this.base}/master-resume/from-latex`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+            body: JSON.stringify({ latex_resume: latexResume })
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+            throw new Error(error.detail || 'Failed to save master resume');
+        }
+        return response.json();
+    },
+
+    async getLatestMasterResume() {
+        const response = await fetch(`${this.base}/master-resume/latest`, {
+            headers: { ...this.authHeaders() }
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+            throw new Error(error.detail || 'Failed to load latest master resume');
+        }
+        return response.json();
     }
 };
 
@@ -121,14 +188,18 @@ const FormHandler = {
             latexResume: document.getElementById('latexResume').value.trim(),
             jobDescription: document.getElementById('jobDescription').value.trim(),
             roleOverride: document.getElementById('roleOverride').value || null,
-            enableAI: document.getElementById('enableAI').checked
+            enableAI: document.getElementById('enableAI').checked,
+            useStored: document.getElementById('useStored').checked
         };
     },
     
     // Validate form
     validate(data) {
-        if (!data.latexResume) {
-            throw new Error('Please provide a LaTeX resume');
+        if (data.useStored && !AppState.authToken) {
+            throw new Error('Please log in to use a stored master resume');
+        }
+        if (!data.useStored && !data.latexResume) {
+            throw new Error('Please provide a LaTeX resume or use a stored master resume');
         }
         if (!data.jobDescription) {
             throw new Error('Please provide a job description');
@@ -445,6 +516,7 @@ const App = {
     async init() {
         this.setupEventListeners();
         await this.checkAIStatus();
+        await this.restoreSession();
     },
     
     // Setup event listeners
@@ -465,6 +537,20 @@ const App = {
         const copyBtn = document.querySelector('button[onclick="copyLatex()"]');
         if (copyBtn) {
             copyBtn.addEventListener('click', () => this.copyLatex());
+        }
+
+        const loginBtn = document.getElementById('loginBtn');
+        const registerBtn = document.getElementById('registerBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const saveMasterBtn = document.getElementById('saveMasterBtn');
+        const useStored = document.getElementById('useStored');
+
+        if (loginBtn) loginBtn.addEventListener('click', () => this.login());
+        if (registerBtn) registerBtn.addEventListener('click', () => this.register());
+        if (logoutBtn) logoutBtn.addEventListener('click', () => this.logout());
+        if (saveMasterBtn) saveMasterBtn.addEventListener('click', () => this.saveMasterResume());
+        if (useStored) {
+            useStored.addEventListener('change', () => this.toggleStoredMode(useStored.checked));
         }
     },
     
@@ -492,12 +578,20 @@ const App = {
             UI.hideResults();
             
             // Submit to API
-            const result = await API.tailor({
-                latex_resume: data.latexResume,
+            let payload = {
                 job_description: data.jobDescription,
                 role_override: data.roleOverride,
                 enable_ai: data.enableAI
-            });
+            };
+
+            if (data.useStored) {
+                const latest = await API.getLatestMasterResume();
+                payload.master_resume_id = latest.id;
+            } else {
+                payload.latex_resume = data.latexResume;
+            }
+
+            const result = await API.tailor(payload);
             
             // Display results
             ResultsDisplay.display(result);
@@ -529,6 +623,102 @@ const App = {
         } else {
             Utils.showToast('Failed to copy. Please select and copy manually.', 'error');
         }
+    }
+};
+
+// Auth helpers
+App.updateAuthUI = function () {
+    const statusEl = document.getElementById('authStatus');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const loginBtn = document.getElementById('loginBtn');
+    const registerBtn = document.getElementById('registerBtn');
+
+    if (AppState.currentUser) {
+        statusEl.textContent = `Logged in as ${AppState.currentUser.email}`;
+        logoutBtn.style.display = 'inline-block';
+        loginBtn.style.display = 'none';
+        registerBtn.style.display = 'none';
+    } else {
+        statusEl.textContent = 'Not logged in';
+        logoutBtn.style.display = 'none';
+        loginBtn.style.display = 'inline-block';
+        registerBtn.style.display = 'inline-block';
+    }
+};
+
+App.restoreSession = async function () {
+    const token = localStorage.getItem('resumeos_token');
+    if (!token) {
+        this.updateAuthUI();
+        return;
+    }
+    AppState.authToken = token;
+    try {
+        const user = await API.me();
+        AppState.currentUser = user;
+    } catch (error) {
+        AppState.authToken = null;
+        AppState.currentUser = null;
+        localStorage.removeItem('resumeos_token');
+    }
+    this.updateAuthUI();
+};
+
+App.login = async function () {
+    try {
+        const email = document.getElementById('authEmail').value.trim();
+        const password = document.getElementById('authPassword').value;
+        if (!email || !password) throw new Error('Email and password required');
+        const token = await API.login(email, password);
+        AppState.authToken = token.access_token;
+        localStorage.setItem('resumeos_token', token.access_token);
+        AppState.currentUser = await API.me();
+        this.updateAuthUI();
+        Utils.showToast('Logged in successfully', 'success');
+    } catch (error) {
+        Utils.showToast(error.message, 'error');
+    }
+};
+
+App.register = async function () {
+    try {
+        const email = document.getElementById('authEmail').value.trim();
+        const password = document.getElementById('authPassword').value;
+        if (!email || !password) throw new Error('Email and password required');
+        await API.register(email, password);
+        await this.login();
+    } catch (error) {
+        Utils.showToast(error.message, 'error');
+    }
+};
+
+App.logout = function () {
+    AppState.authToken = null;
+    AppState.currentUser = null;
+    localStorage.removeItem('resumeos_token');
+    this.updateAuthUI();
+    Utils.showToast('Logged out', 'success');
+};
+
+App.saveMasterResume = async function () {
+    try {
+        if (!AppState.authToken) throw new Error('Please log in first');
+        const latex = document.getElementById('latexResume').value.trim();
+        if (!latex) throw new Error('Please provide a LaTeX resume to save');
+        await API.saveMasterResumeFromLatex(latex);
+        Utils.showToast('Master resume saved', 'success');
+    } catch (error) {
+        Utils.showToast(error.message, 'error');
+    }
+};
+
+App.toggleStoredMode = function (enabled) {
+    const latexEl = document.getElementById('latexResume');
+    latexEl.disabled = enabled;
+    if (enabled) {
+        latexEl.placeholder = 'Using latest stored master resume';
+    } else {
+        latexEl.placeholder = '\\documentclass{article}...';
     }
 };
 

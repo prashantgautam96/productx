@@ -68,7 +68,7 @@ if __name__ == "__main__":
             "api_example:app",
             host="0.0.0.0",
             port=8000,
-            reload=True,  # Auto-reload on code changes
+            reload=False,  # Disabled for restricted environments
             log_level="info"
         )
     except KeyboardInterrupt:

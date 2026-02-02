@@ -353,6 +353,62 @@ resumeos/
 
 ## 🎛️ Configuration
 
+### Database & Auth (New)
+
+Set these environment variables (or add to `.env`) before running the API:
+
+```bash
+DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/resumeos
+JWT_SECRET=change-me
+JWT_ALGORITHM=HS256
+JWT_EXPIRES_MINUTES=60
+```
+
+Auth endpoints:
+
+```bash
+# Register
+curl -X POST "http://localhost:8000/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com","password":"yourpassword"}'
+
+# Login (get JWT)
+curl -X POST "http://localhost:8000/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=you@example.com&password=yourpassword"
+```
+
+Master resume storage:
+
+```bash
+# Save master resume (auth required)
+curl -X POST "http://localhost:8000/master-resume" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d @example_master_resume.json
+
+# Save master resume from LaTeX (UI uses this)
+curl -X POST "http://localhost:8000/master-resume/from-latex" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"latex_resume":"\\\\documentclass{article}..."}'
+
+# Fetch latest
+curl -H "Authorization: Bearer <token>" \
+  "http://localhost:8000/master-resume/latest"
+
+### UI Login & Stored Resume (New)
+
+- Register/Login from the UI.
+- Click **Save Master Resume to Database** to persist the LaTeX resume in Postgres.
+- Enable **Use latest saved master resume** to compile without re‑pasting LaTeX.
+
+### Notes
+
+- `python-multipart` is required for form-based login.
+- `bcrypt` is pinned `<4.0.0` to avoid a known `passlib` compatibility issue.
+```
+
 ### Adding New Role Lenses
 
 ```python
